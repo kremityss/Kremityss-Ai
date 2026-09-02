@@ -86,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _send() {
+    if (!_premium.requireAccess()) return;
     final text = _msgController.text.trim();
     if (text.isEmpty && _pendingAttachments.isEmpty) return;
 

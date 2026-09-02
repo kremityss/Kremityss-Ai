@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../screens/splash_screen.dart';
+import '../screens/license_gate_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/model_library_screen.dart';
 import '../screens/settings_screen.dart';
@@ -10,6 +11,7 @@ import '../screens/logs_screen.dart';
 class AppRoutes {
   static const splash = '/splash';
   static const home = '/home';
+  static const licenseGate = '/license-gate';
   static const modelLibrary = '/models';
   static const settings = '/settings';
   static const apiEndpoints = '/api-endpoints';
@@ -17,6 +19,7 @@ class AppRoutes {
 
   static final pages = [
     GetPage(name: splash, page: () => const SplashScreen()),
+    GetPage(name: licenseGate, page: () => const LicenseGateScreen()),
     GetPage(name: home, page: () => const HomeScreen()),
     GetPage(
       name: modelLibrary,

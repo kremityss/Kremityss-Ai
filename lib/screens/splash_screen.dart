@@ -11,6 +11,7 @@ import '../services/local_api_server_service.dart';
 import '../services/wakelock_service.dart';
 import '../services/log_service.dart';
 import '../services/background_optimizer_service.dart';
+import '../services/premium_access_service.dart';
 import '../routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -79,7 +80,8 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) {
         await BackgroundOptimizerService.checkAndPrompt(context);
       }
-      Get.offAllNamed(AppRoutes.home);
+      final access = Get.find<PremiumAccessService>();
+      Get.offAllNamed(access.hasLicense.value ? AppRoutes.home : AppRoutes.licenseGate);
     } catch (e) {
       if (mounted) setState(() => _status = 'Startup error');
       try {

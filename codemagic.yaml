@@ -14,16 +14,16 @@ workflows:
         script: |
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
-      - name: Build unsigned iOS app
-        script: flutter build ios --release --no-codesign
+      - name: Build unsigned iOS simulator app
+        script: flutter build ios --simulator --release --no-codesign
       - name: Package unsigned iOS app
         script: |
           mkdir -p artifacts
-          cd build/ios/iphoneos
+          cd build/ios/iphonesimulator
           zip -r ../../../artifacts/Kremityss-AI-unsigned-ios.zip Runner.app
     artifacts:
       - artifacts/Kremityss-AI-unsigned-ios.zip
-      - build/ios/iphoneos/Runner.app
+      - build/ios/iphonesimulator/Runner.app
 
   kremityss-android:
     name: Kremityss AI Android

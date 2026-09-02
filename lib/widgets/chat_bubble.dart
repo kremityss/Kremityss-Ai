@@ -54,28 +54,7 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, bool isUser) {
-    if (isUser) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (message.hasAttachments) _buildAttachments(context),
-          Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Text(
-              message.content,
-              style: TextStyle(
-                fontSize: 15,
-                color: context.text,
-                height: 1.6,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    Widget _buildAttachments(BuildContext context) {
+  Widget _buildAttachments(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Wrap(
@@ -124,6 +103,26 @@ class ChatBubble extends StatelessWidget {
       ),
     );
   }
+  Widget _buildContent(BuildContext context, bool isUser) {
+    if (isUser) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (message.hasAttachments) _buildAttachments(context),
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              message.content,
+              style: TextStyle(
+                fontSize: 15,
+                color: context.text,
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
   // AI: render markdown
     return Column(

@@ -15,7 +15,7 @@ workflows:
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
       - name: Generate iOS Flutter build files
-        script: flutter build ios --release --config-only
+        script: flutter build ios --release --config-only --no-codesign
       - name: Build unsigned iPhoneOS app
         script: |
           xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -derivedDataPath build/ios/device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""

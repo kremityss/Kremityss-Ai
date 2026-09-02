@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -6,6 +7,9 @@ import '../controllers/chat_controller.dart';
 import '../controllers/model_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/llm_service.dart';
+import '../services/attachment_service.dart';
+import '../services/premium_access_service.dart';
+import '../models/chat_attachment.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/typing_indicator.dart';
@@ -24,10 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final _modelCtrl = Get.find<ModelController>();
   final _llm = Get.find<LlmService>();
   final _themeCtrl = Get.find<ThemeController>();
+  final _attachmentService = Get.find<AttachmentService>();
+  final _premium = Get.find<PremiumAccessService>();
+  final List<ChatAttachment> _pendingAttachments = [];
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
   bool _sidebarOpen = true;
   bool _autoScrollToBottom = true;
+  bool _internetContextEnabled = false;
   String? _lastRenderedChatId;
 
   // Mobile bottom nav index: 0=Chat, 1=Models, 2=Settings
@@ -79,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _send() {
     final text = _msgController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _pendingAttachments.isEmpty) return;
 
     if (_chatCtrl.activeChat == null) {
       _chatCtrl.newChat();
@@ -87,11 +95,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _msgController.clear();
     _autoScrollToBottom = true;
+    final attachments = List<ChatAttachment>.from(_pendingAttachments);
+    setState(() => _pendingAttachments.clear());
     _chatCtrl.sendMessage(
       text,
       modelFilename: _modelCtrl.selectedModelFilename.value,
+      attachments: attachments,
+      useInternet: _internetContextEnabled,
     );
     _scrollToBottom(force: true);
+  }
+
+  Future<void> _pickPhotos({bool fromCamera = false}) async {
+    final picked = await _attachmentService.pickPhotos(fromCamera: fromCamera);
+    if (!mounted || picked.isEmpty) return;
+    setState(() => _pendingAttachments.addAll(picked));
+  }
+
+  Future<void> _pickFiles() async {
+    final picked = await _attachmentService.pickFiles();
+    if (!mounted || picked.isEmpty) return;
+    setState(() => _pendingAttachments.addAll(picked));
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.bg,
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose photos'),
+              onTap: () { Navigator.pop(context); _pickPhotos(); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () { Navigator.pop(context); _pickPhotos(fromCamera: true); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file_rounded),
+              title: const Text('Choose files, photos, or MP4'),
+              onTap: () { Navigator.pop(context); _pickFiles(); },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -994,46 +1046,195 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWelcome() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: AppColors.accentGradient,
-                borderRadius: BorderRadius.circular(16),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Column(
+            children: [
+              Container(
+                width: 92,
+                height: 92,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.accent, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.35),
+                      blurRadius: 28,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/branding/devhub_kremityss_logo.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.bolt_rounded,
-                size: 32,
-                color: Colors.white,
+              const SizedBox(height: 18),
+              Text(
+                'KREM|AI',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 6,
+                  color: context.text,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'How can I help you?',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: context.text,
+              const SizedBox(height: 6),
+              Text(
+                'BY KREM|AI',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 3,
+                  color: AppColors.accent,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Obx(
-              () => Text(
-                _llm.isLoaded.value
-                    ? 'Type a message below to get started.'
-                    : 'Select a model first to begin chatting.',
-                style: TextStyle(fontSize: 14, color: context.textM),
+              const SizedBox(height: 26),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: context.bgPanel,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: context.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.memory_rounded, color: AppColors.accent),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Obx(() {
+                            final selected = _modelCtrl.selectedModelFilename.value;
+                            final model = selected == null ? null : _modelCtrl.getModelInfo(selected);
+                            return Text(
+                              model?.name ?? 'Qwen2.5-Coder 3B',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontWeight: FontWeight.w700, color: context.text),
+                            );
+                          }),
+                        ),
+                        Obx(() => _premium.isPremium.value
+                            ? const Icon(Icons.verified_rounded, color: AppColors.green, size: 19)
+                            : Icon(Icons.lock_outline_rounded, color: context.textD, size: 18)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Obx(() => Text(
+                          _llm.isLoaded.value
+                              ? 'Ready for private local chat.'
+                              : 'Download and load the recommended model to begin.',
+                          style: TextStyle(fontSize: 13, color: context.textM),
+                        )),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _showAttachmentMenu,
+                            icon: const Icon(Icons.add_photo_alternate_outlined, size: 17),
+                            label: const Text('Add media'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => setState(() => _mobileTabIndex = 1),
+                            icon: const Icon(Icons.folder_open_outlined, size: 17),
+                            label: const Text('Models'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Ask anything, attach photos or files, and keep your work on-device.',
                 textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: context.textM),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentStrip() {
+    if (_pendingAttachments.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+        scrollDirection: Axis.horizontal,
+        itemCount: _pendingAttachments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final attachment = _pendingAttachments[index];
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: attachment.isImage ? 58 : 150,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: context.bgHover,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.border),
+                ),
+                child: attachment.isImage && attachment.bytes != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.memory(attachment.bytes!, fit: BoxFit.cover),
+                      )
+                    : Row(
+                        children: [
+                          Icon(
+                            attachment.isVideo
+                                ? Icons.videocam_outlined
+                                : Icons.insert_drive_file_outlined,
+                            size: 18,
+                            color: attachment.isVideo ? AppColors.orange : AppColors.accent,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              attachment.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: context.text),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              Positioned(
+                top: -7,
+                right: -7,
+                child: InkWell(
+                  onTap: () => setState(() => _pendingAttachments.removeAt(index)),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, size: 13, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1057,7 +1258,26 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // Photo and file attachment menu
+            Padding(
+              padding: const EdgeInsets.only(left: 8, bottom: 6),
+              child: _circleButton(
+                icon: Icons.add_rounded,
+                color: context.textM,
+                onTap: _showAttachmentMenu,
+                tooltip: 'Attach photo or file',
+              ),
+            ),
+
             // Text field
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 6),
+              child: IconButton(
+                tooltip: _internetContextEnabled ? 'Internet context on' : 'Enable internet context',
+                onPressed: () => setState(() => _internetContextEnabled = !_internetContextEnabled),
+                icon: Icon(Icons.public, color: _internetContextEnabled ? AppColors.red : context.textM, size: 20),
+              ),
+            ),
             Expanded(
               child: TextField(
                 controller: _msgController,

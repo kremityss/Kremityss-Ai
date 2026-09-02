@@ -29,13 +29,30 @@ class MessageModel extends HiveObject {
   @HiveField(4)
   String? imageMimeType;
 
+  @HiveField(5)
+  final List<String> attachmentNames;
+
+  @HiveField(6)
+  final List<String> attachmentMimeTypes;
+
+  @HiveField(7)
+  final List<String> attachmentBase64;
+
   MessageModel({
     required this.role,
     required this.content,
     DateTime? timestamp,
     this.imageBase64,
     this.imageMimeType,
-  }) : timestamp = timestamp ?? DateTime.now();
+    List<String>? attachmentNames,
+    List<String>? attachmentMimeTypes,
+    List<String>? attachmentBase64,
+  })  : attachmentNames = attachmentNames ?? const [],
+        attachmentMimeTypes = attachmentMimeTypes ?? const [],
+        attachmentBase64 = attachmentBase64 ?? const [],
+        timestamp = timestamp ?? DateTime.now();
+
+  bool get hasAttachments => attachmentNames.isNotEmpty;
 
   bool get isUser => role == MessageRole.user;
   bool get isAssistant => role == MessageRole.assistant;

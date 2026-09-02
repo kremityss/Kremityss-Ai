@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
@@ -54,20 +56,76 @@ class ChatBubble extends StatelessWidget {
 
   Widget _buildContent(BuildContext context, bool isUser) {
     if (isUser) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 3),
-        child: Text(
-          message.content,
-          style: TextStyle(
-            fontSize: 15,
-            color: context.text,
-            height: 1.6,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (message.hasAttachments) _buildAttachments(context),
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              message.content,
+              style: TextStyle(
+                fontSize: 15,
+                color: context.text,
+                height: 1.6,
+              ),
+            ),
           ),
-        ),
+        ],
       );
     }
 
-    // AI: render markdown
+    Widget _buildAttachments(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(message.attachmentNames.length, (index) {
+          final name = message.attachmentNames[index];
+          final mime = index < message.attachmentMimeTypes.length
+              ? message.attachmentMimeTypes[index]
+              : 'application/octet-stream';
+          final imageIndex = message.attachmentMimeTypes
+              .take(index + 1)
+              .where((type) => type.startsWith('image/'))
+              .length - 1;
+          final hasPreview = mime.startsWith('image/') &&
+              imageIndex >= 0 && imageIndex < message.attachmentBase64.length;
+
+          return Container(
+            constraints: const BoxConstraints(maxWidth: 220),
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: context.bgHover,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: context.border),
+            ),
+            child: hasPreview
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.memory(
+                      base64Decode(message.attachmentBase64[imageIndex]),
+                      width: 160,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(mime.startsWith('image/') ? Icons.image_outlined : Icons.insert_drive_file_outlined, size: 18, color: AppColors.accent),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.text))),
+                    ],
+                  ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // AI: render markdown
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

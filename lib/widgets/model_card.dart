@@ -12,6 +12,7 @@ class ModelCard extends StatelessWidget {
   final DownloadState? downloadState;
   final bool isLoaded;
   final bool isLoadingModel;
+  final bool isLocked;
   final String loadingStatusMsg;
   final double loadingProgress;
   final VoidCallback onDownload;
@@ -30,6 +31,7 @@ class ModelCard extends StatelessWidget {
     this.downloadState,
     required this.isLoaded,
     required this.isLoadingModel,
+    this.isLocked = false,
     this.loadingStatusMsg = '',
     this.loadingProgress = 0.0,
     required this.onDownload,
@@ -76,6 +78,8 @@ class ModelCard extends StatelessWidget {
                   _statusBadge('LOADING', AppColors.orange, Icons.hourglass_top_rounded),
                 if (isCurrentlyDownloading)
                   _statusBadge('DOWNLOADING', AppColors.orange, Icons.downloading_rounded),
+                if (isLocked)
+                  _statusBadge('PREMIUM ONLY', AppColors.orange, Icons.lock_outline_rounded),
               ],
             ),
 
@@ -298,6 +302,22 @@ class ModelCard extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context) {
+    if (isLocked) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: onDownload,
+          icon: const Icon(Icons.lock_outline_rounded, size: 17),
+          label: const Text('Unlock with Premium Key'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.orange,
+            side: BorderSide(color: AppColors.orange.withOpacity(0.6)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    }
+
     // If it's a custom model, we show the red remove icon.
     // We use it instead of the regular 'delete file' if it's downloaded.
     final Widget removeIcon = IconButton(

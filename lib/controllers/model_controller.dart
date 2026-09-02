@@ -10,11 +10,13 @@ import '../services/model_manager.dart';
 import '../services/llm_service.dart';
 import '../services/chat_storage_service.dart';
 import '../services/log_service.dart';
+import '../services/premium_access_service.dart';
 
 class ModelController extends GetxController {
   final ModelManager _manager = Get.find<ModelManager>();
   final LlmService _llm = Get.find<LlmService>();
   final ChatStorageService _storage = Get.find<ChatStorageService>();
+  final PremiumAccessService _premium = Get.find<PremiumAccessService>();
 
   // ── Observable State ──────────────────────────────────────────
   final selectedModelFilename = RxnString();
@@ -58,6 +60,7 @@ class ModelController extends GetxController {
 
   /// Download a model.
   Future<void> downloadModel(AiModelInfo model) async {
+    if (model.premiumOnly && !_premium.requirePremium()) return;
     final confirmed = await _confirmLargeModel(model.sizeGb);
     if (!confirmed) return;
 
@@ -110,6 +113,9 @@ class ModelController extends GetxController {
 
   /// Load a model into the LLM engine.
   Future<void> loadModel(String filename) async {
+    final model = getModelInfo(filename);
+    if (model != null && model.premiumOnly && !_premium.requirePremium()) return;
+
     // If already loading something, cancel it first
     if (isLoadingModel.value) {
       cancelLoadModel();
@@ -260,6 +266,7 @@ class ModelController extends GetxController {
 
   /// Import a .gguf file via file picker.
   Future<void> importModelFromFile() async {
+    if (!_premium.requirePremium()) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
@@ -361,6 +368,7 @@ class ModelController extends GetxController {
 
   /// Import from a directory — scan for all .gguf files.
   Future<void> importFromDirectory() async {
+    if (!_premium.requirePremium()) return;
     try {
       final dirPath = await FilePicker.platform.getDirectoryPath();
       if (dirPath == null) return;
@@ -459,6 +467,7 @@ class ModelController extends GetxController {
   /// Add a custom model from a URL.
   /// Does a HEAD request first to fetch file size.
   Future<void> addCustomUrlModel({required String name, required String url}) async {
+    if (!_premium.requirePremium()) return;
     // Extract filename from URL
     final uri = Uri.parse(url);
     String filename = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';

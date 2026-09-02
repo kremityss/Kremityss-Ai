@@ -1,7 +1,7 @@
 name: portable_ai_flutter
-description: "Portable AI — Run uncensored local LLMs natively on any device."
+description: "Krem|Ai — private local-first GGUF chat with optional internet context, photo, and file attachments."
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: ^3.11.4
@@ -27,6 +27,8 @@ dependencies:
   path_provider: ^2.1.5            # App documents / downloads dir
   path: ^1.9.1                     # Path string utilities
   file_picker: ^8.1.7              # Cross-platform file/folder picker
+  image_picker: ^1.1.2             # iOS photo library and camera access
+  url_launcher: ^6.3.1             # Open Krem|Ai key and payment pages
 
   # ── UI Helpers ───────────────────────────────────────────────────
   flutter_markdown: ^0.7.6         # Render AI markdown responses
@@ -46,6 +48,8 @@ dev_dependencies:
   hive_generator: ^2.0.1           # Hive type adapter code gen
   build_runner: ^2.4.13            # Code generation runner
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
 
 hooks:
   user_defines:
@@ -56,7 +60,29 @@ hooks:
           windows-x64: [vulkan]
           android-arm64: [cpu, vulkan, opencl]
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/devhub_kremityss_logo.png
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#080808"
+  color_dark: "#080808"
+  image: assets/branding/devhub_kremityss_logo.png
+  image_dark: assets/branding/devhub_kremityss_logo.png
+  android_12:
+    color: "#080808"
+    color_dark: "#080808"
+    image: assets/branding/devhub_kremityss_logo.png
+    image_dark: assets/branding/devhub_kremityss_logo.png
+  ios: true
+  android: true
+  web: false
+
 flutter:
   uses-material-design: true
   assets:
     - assets/models_catalog.json
+    - assets/branding/devhub_kremityss_logo.png
+    - assets/branding/kremityss_ai_logo.png

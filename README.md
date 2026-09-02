@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1>Uncensored Local AI Multi-Platform</h1>
+  <h1>Kremityss AI Multi-Platform</h1>
 
   <p><strong>Run unrestricted AI models entirely on your device.<br/>No cloud. No filters. No limits.</strong></p>
 
@@ -13,7 +13,7 @@
 
 ## Overview
 
-**Uncensored Local AI** is a mobile-first application that runs powerful open-source AI models directly on your **Android or iOS device** — with zero censorship, zero cloud dependency, and zero monthly fees.
+**Kremityss AI** is a mobile-first application that runs powerful open-source AI models directly on your **Android or iOS device** — with zero censorship, zero cloud dependency, and zero monthly fees.
 
 No API keys. No subscriptions. No content restrictions. Your conversations never leave your device.
 
@@ -23,7 +23,7 @@ No API keys. No subscriptions. No content restrictions. Your conversations never
 
 **🎥 Watch the Setup & Demo Video: [https://youtu.be/2Pnv68iHIaQ](https://youtu.be/2Pnv68iHIaQ)**
 
-[![Uncensored Local AI Demo](https://img.youtube.com/vi/2Pnv68iHIaQ/maxresdefault.jpg)](https://youtu.be/2Pnv68iHIaQ)
+[![Kremityss AI Demo](https://img.youtube.com/vi/2Pnv68iHIaQ/maxresdefault.jpg)](https://youtu.be/2Pnv68iHIaQ)
 
 ---
 
@@ -113,20 +113,22 @@ If you encounter issues on desktop, please [open an issue](https://github.com/te
 
 ---
 
-## Recommended Models
+## Recommended Model
 
-| Model | Size | Best For | Type |
-|-------|------|----------|------|
-| **Gemma 2 2B** | ~1.6 GB | Low-RAM phones, fast replies | Standard |
-| **Gemma 4 E4B Heretic** | ~5.3 GB | High-quality, fully uncensored | Uncensored |
+| Model | Approx. Size | Best For | Type |
+|-------|--------------|----------|------|
+| **Qwen2.5 Coder 3B Instruct Abliterated Q4_K_S** | ~2 GB | Fast coding, general chat, and text-file analysis | Recommended · Coding |
+| **Qwen2.5 Coder 7B Instruct Abliterated Q4_K_S** | ~4.6 GB | Stronger coding on higher-memory phones | Abliterated · Coding |
+| **Mistral 7B Instruct v0.3 Abliterated Q4_K_S** | ~4.2 GB | General chat and writing | Abliterated · General |
+| **Llama 3.1 8B Instruct Abliterated Q4_K_M** | ~4.9 GB | Stronger general reasoning on higher-memory phones | Abliterated · General |
 
-> Models are downloaded directly inside the app from the **Models** tab. No manual setup needed.
+> Models are downloaded directly inside the app from the **Models** tab. The 3B model is the safest starting point for iPhone 14-class devices; 7B/8B models use more memory and may be slower.
 
 ---
 
 ## Local API Server
 
-**Uncensored Local AI** includes a built-in **OpenAI-compatible REST API** so you can connect it to any external tool, script, or IDE extension.
+**Kremityss AI** includes a built-in **OpenAI-compatible REST API** so you can connect it to any external tool, script, or IDE extension.
 
 ### Setup
 
@@ -206,3 +208,33 @@ See [LICENSE](LICENSE) for full details.
 <div align="center">
   <sub>Built with ❤️ using Flutter · Powered by <a href="https://github.com/ggerganov/llama.cpp">llama.cpp</a></sub>
 </div>
+
+## DevHub Premium and uploads
+
+DevHub by Kremityss AI keeps the bundled Qwen2.5-Coder GGUF as the only catalog model. Custom `.gguf` files, folders, and model download links are gated behind an active paid premium key. Photos, general files, and video files such as MP4 remain available as chat attachments; text-readable files are added to the local prompt context, while binary/video files are retained as attachments and shown in the conversation.
+
+The premium gate is implemented in `lib/services/premium_access_service.dart`. Connect it to the future KeyAuth-backed website by building with `KEYAUTH_VALIDATION_URL` and optionally `KEYAUTH_PRODUCT_ID` values. The endpoint should accept a JSON body containing `key` and `product`, then return JSON such as `{ "valid": true, "premium": true, "message": "Premium active" }`. Until the endpoint is configured, custom model imports remain locked by design.
+
+The main dashboard now exposes the DevHub-branded model status card, media/file attachment actions, and premium state. The model-library import button opens the premium activation dialog before allowing local GGUF, directory, or URL imports.
+
+### Cloud iOS build
+
+Codemagic can build the project on a cloud macOS runner. For the initial unsigned iOS build, use Release mode with `--no-codesign`. A signed iOS build additionally requires a matching `.p12` certificate and `.mobileprovision` profile configured through Codemagic’s secure signing settings; neither should be committed to GitHub.
+
+### KeyAuth and payment links
+
+The app includes a **Get a free key** button linked to `https://kremcheats.com/free-key/complete`, plus Cash App, PayPal, and Bitcoin purchase buttons in the Premium dialog. Payment buttons open the configured premium page by default and can be pointed at direct payment pages with `--dart-define` values. No payment handle, wallet address, or KeyAuth secret is hard-coded.
+
+Configure the app against a server-side KeyAuth validation proxy when building:
+
+```bash
+flutter build apk --release \
+  --dart-define=KEYAUTH_VALIDATION_URL=https://kremcheats.com/api/devhub/validate-key \
+  --dart-define=KEYAUTH_PRODUCT_ID=devhub-premium \
+  --dart-define=PREMIUM_URL=https://kremcheats.com/premium \
+  --dart-define=CASHAPP_URL=https://cash.app/$YOUR_TAG \
+  --dart-define=PAYPAL_URL=https://paypal.me/YOUR_NAME \
+  --dart-define=BITCOIN_URL=https://kremcheats.com/pay/bitcoin
+```
+
+The validation proxy receives `{ "key": "...", "product": "devhub-premium" }`, validates it with KeyAuth on the server, and returns `{ "valid": true, "premium": true, "status": "active" }` for an active entitlement. See [`docs/DEVHUB_KEYAUTH_AND_PAYMENTS.md`](docs/DEVHUB_KEYAUTH_AND_PAYMENTS.md) for the complete API contract and payment webhook guidance.

@@ -1,0 +1,44 @@
+workflows:
+  kremityss-ios-unsigned:
+    name: Kremityss AI iOS unsigned
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Generate launcher icons and native splash
+        script: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+      - name: Build unsigned iOS app
+        script: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        script: |
+          mkdir -p artifacts
+          cd build/ios/iphoneos
+          zip -r ../../../artifacts/Kremityss-AI-unsigned-ios.zip Runner.app
+    artifacts:
+      - artifacts/Kremityss-AI-unsigned-ios.zip
+      - build/ios/iphoneos/Runner.app
+
+  kremityss-android:
+    name: Kremityss AI Android
+    max_build_duration: 45
+    instance_type: linux_x2
+    environment:
+      flutter: stable
+    scripts:
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Generate launcher icons and native splash
+        script: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+      - name: Build Android APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk

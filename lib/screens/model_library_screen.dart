@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../theme/app_colors.dart';
 import '../controllers/model_controller.dart';
 import '../services/model_manager.dart';
+import '../services/premium_access_service.dart';
+import '../services/devhub_links.dart';
 import '../models/ai_model_info.dart';
 import '../widgets/model_card.dart';
 
@@ -104,6 +107,7 @@ class _ModelLibraryBodyState extends State<_ModelLibraryBody> {
             final allCatalog = ctrl.catalog.toList();
             final downloaded = manager.downloadedModels.toList();
             final _ = manager.activeDownloads.length;
+            final premiumActive = Get.find<PremiumAccessService>().isPremium.value;
             // ignore: unused_local_variable
             final tick = manager.tick.value;
 
@@ -214,6 +218,7 @@ class _ModelLibraryBodyState extends State<_ModelLibraryBody> {
                             ctrl.selectedModelFilename.value ==
                                 model.filename &&
                             ctrl.isModelLoaded,
+                        isLocked: model.premiumOnly && !premiumActive,
                         isLoadingModel:
                             ctrl.loadingModelFilename.value == model.filename,
                         loadingStatusMsg: ctrl.loadingStatusMsg.value,
@@ -412,23 +417,29 @@ class _ImportButton extends StatelessWidget {
   final ModelController ctrl;
   const _ImportButton({required this.ctrl});
 
+  PremiumAccessService get _premium => Get.find<PremiumAccessService>();
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.accent,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        onTap: () => _showImportOptions(context),
+        onTap: () => _ensurePremiumThenImport(context),
         borderRadius: BorderRadius.circular(20),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_rounded, size: 18, color: Colors.white),
+              Obx(() => Icon(
+                _premium.isPremium.value ? Icons.add_rounded : Icons.lock_outline_rounded,
+                size: 17,
+                color: Colors.white,
+              )),
               SizedBox(width: 4),
-              Text(
-                'Import',
+              Obx(() => Text(
+                _premium.isPremium.value ? 'Import' : 'Premium',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -440,6 +451,136 @@ class _ImportButton extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _ensurePremiumThenImport(BuildContext context) async {
+    if (_premium.isPremium.value) {
+      _showImportOptions(context);
+      return;
+    }
+
+    final keyController = TextEditingController();
+    final activated = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: context.bgPanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.workspace_premium_rounded, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Text('Krem|Ai Premium', style: TextStyle(color: context.text)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Paid keys unlock custom GGUF files, folders, and model links.',
+              style: TextStyle(color: context.textM),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _openLink(DevHubLinks.freeKeyUrl),
+                icon: const Icon(Icons.key_rounded, size: 17),
+                label: const Text('Get a free key'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  foregroundColor: AppColors.accent,
+                ),
+              ),
+            ),
+            Text(
+              'Lifetime key payment methods',
+              style: TextStyle(
+                color: context.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _paymentButton(context, 'Cash App', DevHubLinks.cashAppUrl),
+                _paymentButton(context, 'PayPal', DevHubLinks.paypalUrl),
+                _paymentButton(context, 'Bitcoin', DevHubLinks.bitcoinUrl),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: keyController,
+              obscureText: true,
+              style: TextStyle(color: context.text),
+              decoration: InputDecoration(
+                labelText: 'Premium key',
+                labelStyle: TextStyle(color: context.textD),
+                filled: true,
+                fillColor: context.bgInput,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Obx(() => Text(
+                  _premium.keyHint.value,
+                  style: TextStyle(color: context.textD, fontSize: 11),
+                )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text('Cancel', style: TextStyle(color: context.textD)),
+          ),
+          Obx(() => ElevatedButton(
+                onPressed: _premium.isChecking.value
+                    ? null
+                    : () async {
+                        final valid = await _premium.activateKey(keyController.text);
+                        if (valid && Get.isDialogOpen == true) {
+                          Get.back(result: true);
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+                child: Text(
+                  _premium.isChecking.value ? 'Checking...' : 'Activate',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              )),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    keyController.dispose();
+    if (activated == true && context.mounted) _showImportOptions(context);
+  }
+
+  Widget _paymentButton(BuildContext context, String label, String url) {
+    return OutlinedButton(
+      onPressed: () => _openLink(DevHubLinks.paymentUrl(url)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: context.textM,
+        side: BorderSide(color: context.border),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 11)),
+    );
+  }
+
+  Future<void> _openLink(String rawUrl) async {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      Get.snackbar(
+        'Link unavailable',
+        'Please configure the Krem|Ai payment or key link first.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 
   void _showImportOptions(BuildContext context) {

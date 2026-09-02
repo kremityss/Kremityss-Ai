@@ -147,10 +147,9 @@ class LlmService extends GetxService {
         return;
       }
 
-      // Use smaller context on Android to prevent OOM kills.
-      // Desktop can handle 2048, but Android devices with limited RAM
-      // need 1024 to avoid the Low Memory Killer (LMK).
-      final contextSize = Platform.isAndroid ? 1024 : 2048;
+      // Choose context from model size so smaller devices stay responsive while
+      // lightweight models can use a larger working window.
+      final contextSize = _adaptiveContextSize(fileSize);
 
       // Map the string backend to GpuBackend enum
       final storage = Get.find<ChatStorageService>();
@@ -222,6 +221,17 @@ class LlmService extends GetxService {
     } finally {
       _resetLoadingState();
     }
+  }
+
+  int _adaptiveContextSize(int fileBytes) {
+    final sizeGb = fileBytes / (1024 * 1024 * 1024);
+    if (Platform.isIOS || Platform.isAndroid) {
+      if (sizeGb <= 3.5) return 4096;
+      if (sizeGb <= 5.5) return 3072;
+      return 2048;
+    }
+    if (sizeGb <= 5.5) return 8192;
+    return 4096;
   }
 
   void _resetLoadingState() {

@@ -44,6 +44,25 @@ Be highly useful, direct, technically precise, and honest about uncertainty. Ana
     return true;
   }
 
+  String _persistentMemoryContext(ChatModel current) {
+    final snippets = <String>[];
+    for (final other in chats) {
+      if (other.id == current.id) continue;
+      for (final message in other.messages.reversed) {
+        if (message.content.trim().isEmpty || message.content.startsWith('⚠')) continue;
+        snippets.add('${other.title}: ${message.content.trim()}');
+        if (snippets.length >= 12) break;
+      }
+      if (snippets.length >= 12) break;
+    }
+    final joined = snippets.join('\n');
+    if (joined.isEmpty) return '';
+    const maxMemoryCharacters = 6000;
+    return joined.length > maxMemoryCharacters
+        ? joined.substring(0, maxMemoryCharacters)
+        : joined;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -176,12 +195,17 @@ Be highly useful, direct, technically precise, and honest about uncertainty. Ana
         final customPrompt = chat.systemPrompt.isNotEmpty
           ? chat.systemPrompt
           : systemPrompt.value;
+      final memory = _persistentMemoryContext(chat);
+      final memoryPrompt = memory.isEmpty
+          ? ''
+          : '\n\nRelevant local memory from earlier chats (use only when relevant; do not invent facts):\n$memory';
       final effectivePrompt = customPrompt.trim().isEmpty
           ? defaultDeveloperPrompt
-          : '$defaultDeveloperPrompt\\n\\nAdditional user instructions:\\n$customPrompt';
+          : '$defaultDeveloperPrompt\n\nAdditional user instructions:\n$customPrompt';
+      final promptWithMemory = '$effectivePrompt$memoryPrompt';
       final stream = _llm.generate(
         messages: history,
-        systemPrompt: effectivePrompt,
+        systemPrompt: promptWithMemory,
         temperature: temperature.value.clamp(0.15, 0.85),
       );
 

@@ -15,6 +15,7 @@ import '../widgets/chat_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import 'model_library_screen.dart';
 import 'settings_screen.dart';
+import 'social_links_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,10 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final _scrollController = ScrollController();
   bool _sidebarOpen = true;
   bool _autoScrollToBottom = true;
-  bool _internetContextEnabled = false;
+  bool _internetContextEnabled = true;
   String? _lastRenderedChatId;
 
-  // Mobile bottom nav index: 0=Chat, 1=Models, 2=Settings
+  // Mobile bottom nav index: 0=Chat, 1=Models, 2=Settings, 3=Links
   int _mobileTabIndex = 0;
 
   // Scaffold key for drawer
@@ -114,9 +115,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickFiles() async {
-    final picked = await _attachmentService.pickFiles();
-    if (!mounted || picked.isEmpty) return;
-    setState(() => _pendingAttachments.addAll(picked));
+    try {
+      final picked = await _attachmentService.pickFiles();
+      if (!mounted || picked.isEmpty) return;
+      setState(() => _pendingAttachments.addAll(picked));
+    } on AttachmentLimitException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read that file. Try a smaller file or a plain-text export.')));
+      }
+    }
   }
 
   void _showAttachmentMenu() {
@@ -398,6 +409,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const ModelLibraryScreen(embedded: true),
             // Tab 2: Settings
             const SettingsScreen(embedded: true),
+            // Tab 3: Social links and portal
+            const SocialLinksScreen(),
           ],
         ),
       ),
@@ -433,11 +446,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined, color: context.textM),
-              selectedIcon: const Icon(
-                Icons.settings_rounded,
-                color: AppColors.accent,
-              ),
+              selectedIcon: const Icon(Icons.settings_rounded, color: AppColors.accent),
               label: 'Settings',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.public_outlined, color: context.textM),
+              selectedIcon: const Icon(Icons.public_rounded, color: AppColors.accent),
+              label: 'Links',
             ),
           ],
         ),

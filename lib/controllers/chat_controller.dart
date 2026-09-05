@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:get/get.dart';
+import 'package:hive/hive.dart';
 
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
@@ -9,11 +10,12 @@ import '../services/llm_service.dart';
 import '../services/chat_storage_service.dart';
 import '../services/web_search_service.dart';
 import '../models/chat_attachment.dart';
+import '../services/premium_access_service.dart';
 
 class ChatController extends GetxController {
   static const defaultDeveloperPrompt = '''You are Krem|Ai, a private local-first coding assistant. Internet context is used only when the user enables it.
 
-Be highly useful, direct, technically precise, and honest about uncertainty. Analyze the user’s request before answering. For coding tasks, provide complete runnable solutions, preserve the user’s existing architecture, explain important trade-offs briefly, and identify bugs, edge cases, security risks, and missing dependencies. Prefer clear Markdown with headings, concise explanations, and fenced code blocks with the correct language tag. When revising code, show the exact replacement or a focused diff and explain where it belongs. Never invent APIs, test results, file contents, or tool actions. Use attached text and files as source material, clearly distinguishing facts from assumptions. For images and binary files, describe only what the available local model can actually infer. Ask one focused clarification question only when it is necessary to avoid a wrong implementation.''';
+Be highly useful, direct, technically precise, and honest about uncertainty. Analyze the user’s request before answering. Built-in skills: coding (write complete runnable solutions), debugging (find root causes and fixes), code review (identify correctness, security, and performance issues), explain (teach step by step), refactor (preserve behavior while improving structure), summarize (extract decisions and action items), and research (separate verified web context from assumptions). For coding tasks, preserve the user’s existing architecture, explain important trade-offs briefly, and identify bugs, edge cases, security risks, and missing dependencies. Prefer clear Markdown with headings, concise explanations, and fenced code blocks with the correct language tag. When revising code, show the exact replacement or a focused diff and explain where it belongs. Never invent APIs, test results, file contents, or tool actions. Use attached text and files as source material, clearly distinguishing facts from assumptions. Ask one focused clarification question only when it is necessary to avoid a wrong implementation.''';
   final LlmService _llm = Get.find<LlmService>();
   final ChatStorageService _storage = Get.find<ChatStorageService>();
   final WebSearchService _webSearch = Get.find<WebSearchService>();
@@ -26,6 +28,21 @@ Be highly useful, direct, technically precise, and honest about uncertainty. Ana
   final systemPrompt = ''.obs;
 
   StreamSubscription<String>? _genSub;
+
+  static const standardDailyFileLimit = 4;
+  final _settings = Hive.box('settings');
+
+  bool _underStandardDailyLimit({int files = 0}) {
+    if (Get.find<PremiumAccessService>().isPremium.value) return true;
+    if (files == 0) return true;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final storedDay = _settings.get('standard_usage_day') as String?;
+    final used = storedDay == today ? (_settings.get('standard_usage_count', defaultValue: 0) as num).toInt() : 0;
+    if (used + files > standardDailyFileLimit) return false;
+    _settings.put('standard_usage_day', today);
+    _settings.put('standard_usage_count', used + files);
+    return true;
+  }
 
   @override
   void onInit() {
@@ -87,14 +104,27 @@ Be highly useful, direct, technically precise, and honest about uncertainty. Ana
     bool useInternet = false,
   }) async {
     if (text.trim().isEmpty && attachments.isEmpty) return;
+    if (!_underStandardDailyLimit(files: attachments.length)) {
+      Get.snackbar('Standard file limit reached', 'Standard access allows 4 attached files per day. Premium access is unlimited.');
+      return;
+    }
     final chat = activeChat;
     if (chat == null) return;
 
+    var remainingContext = 120000;
     final attachmentPrompt = attachments
         .where((a) => a.hasExtractedText)
-        .map((a) => '\n\n--- File: ${a.name} ---\n${a.extractedText}')
+        .map((a) {
+          final raw = a.extractedText ?? '';
+          if (remainingContext <= 0) return '';
+          final take = raw.length.clamp(0, remainingContext);
+          remainingContext -= take;
+          return '\n\n--- File: ${a.name} ---\n${raw.substring(0, take)}';
+        })
         .join();
-    final webContext = useInternet ? await _webSearch.search(text) : '';
+    final webContext = useInternet && text.trim().isNotEmpty
+        ? await _webSearch.search(text.trim())
+        : '';
     final promptText = text.trim().isEmpty && attachmentPrompt.isEmpty
         ? 'Please review the attached files.'
         : '${text.trim()}$attachmentPrompt${webContext.isNotEmpty ? '\n\n$webContext' : ''}';
@@ -126,6 +156,11 @@ Be highly useful, direct, technically precise, and honest about uncertainty. Ana
     // Build message history for LLM
     final history = chat.messages
         .where((m) => !m.isSystem)
+        .toList()
+        .reversed
+        .take(12)
+        .toList()
+        .reversed
         .map((m) => m.toLlamaMessage())
         .toList();
 

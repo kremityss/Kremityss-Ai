@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hive/hive.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../routes/app_routes.dart';
@@ -28,6 +29,30 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     FocusManager.instance.primaryFocus?.unfocus();
     final valid = await _access.activateKey(_keyController.text);
     if (!mounted || !valid) return;
+    final settings = Hive.box('settings');
+    if (settings.get('portal_prompt_dismissed', defaultValue: false) != true) {
+      var dontAskAgain = false;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Connect your KremCheats account'),
+            content: const Text('Open the customer portal to view your keys, downloads, community access, and account details.'),
+            actions: [
+              CheckboxListTile(
+                value: dontAskAgain,
+                onChanged: (value) => setDialogState(() => dontAskAgain = value ?? false),
+                title: const Text('Do not show again'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('LATER')),
+              FilledButton(onPressed: () { Navigator.pop(dialogContext); _open(DevHubLinks.portalUrl); }, child: const Text('OPEN PORTAL')),
+            ],
+          ),
+        ),
+      );
+      if (dontAskAgain) await settings.put('portal_prompt_dismissed', true);
+    }
     Get.offAllNamed(AppRoutes.home);
   }
 

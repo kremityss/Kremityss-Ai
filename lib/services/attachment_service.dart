@@ -4,8 +4,18 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:get/get.dart';
+
+import 'premium_access_service.dart';
 
 import '../models/chat_attachment.dart';
+
+class AttachmentLimitException implements Exception {
+  final String message;
+  const AttachmentLimitException(this.message);
+  @override
+  String toString() => message;
+}
 
 class AttachmentService {
   final ImagePicker _imagePicker = ImagePicker();
@@ -35,14 +45,25 @@ class AttachmentService {
     );
     if (result == null) return const [];
 
+    final isPremium = Get.find<PremiumAccessService>().isPremium.value;
+    final maxBytes = isPremium ? 1 << 62 : 1024 * 1024 * 1024;
+    var totalBytes = 0;
     final attachments = <ChatAttachment>[];
     for (final picked in result.files) {
       final bytes = picked.bytes ??
           (picked.path == null ? null : await File(picked.path!).readAsBytes());
       if (bytes == null) continue;
+      totalBytes += bytes.length;
+      if (!isPremium && attachments.length >= 4) {
+        throw const AttachmentLimitException('Standard access allows up to 4 files per day. Premium access removes this limit.');
+      }
+      if (totalBytes > maxBytes) {
+        throw const AttachmentLimitException('The combined attachment limit is 1 GB.');
+      }
 
       final mime = _mimeType(picked.name);
       final text = _extractText(picked.name, bytes, mime);
+
       attachments.add(ChatAttachment(
         name: picked.name,
         mimeType: mime,
@@ -67,7 +88,10 @@ class AttachmentService {
         lower.endsWith('.js') ||
         lower.endsWith('.swift');
     if (!isText) return null;
-    return utf8.decode(bytes, allowMalformed: true);
+    final decoded = utf8.decode(bytes, allowMalformed: true);
+    const maxExtractedCharacters = 48000;
+    if (decoded.length <= maxExtractedCharacters) return decoded;
+    return '${decoded.substring(0, maxExtractedCharacters)}\n\n[Attachment truncated to protect the model context window.]';
   }
 
   String _mimeType(String name, {String fallback = 'application/octet-stream'}) {
